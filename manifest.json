@@ -1,0 +1,23 @@
+{
+  "name": "Bayes Trainer",
+  "version": "0.0.0.1",
+  "manifest_version": 2,
+  "options_page": "options.html",
+  "icons" : {
+    "16" : "img/bayes_trainer.png"
+  },
+  "background" : {
+    "page": "background.html"
+  },
+  "content_scripts" : [
+    {
+      "matches": ["http://facebook.com/*"],
+      "js": ["content_fb.js"]
+    }
+  ],
+  "permissions" : [
+    "tabs",
+    "contextMenus",
+    "clipboardWrite"
+    ]
+}
