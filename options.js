@@ -6,7 +6,7 @@ function loadOptions() {
   
   if((typeof(trainingData) != 'undefined') && (trainingData !== null)){
     bayes = new classifier.Bayesian();
-    bayes.fromJSON(trainingData);
+    bayes.fromJSON(JSON.parse(trainingData));
     document.getElementById('training_data').value=trainingData;
   }
   
@@ -22,11 +22,6 @@ function loadOptions() {
   document.getElementById('raw_data').value = raw_data;
 }
 
-function saveOptions() {
-}
-
-function eraseOptions() {
-}
 window.addEventListener('load', function(){
   loadOptions();
 });
@@ -38,8 +33,6 @@ document.getElementById('btn_retrain').addEventListener('click', function(){
   }
   var s = JSON.stringify(bayes.toJSON());
   var l = s.length;
-//  var lzw = LZW.compress(s);
-//  var llzw = lzw.length;
   localStorage['TrainingData'] = s;
   loadOptions();
 });

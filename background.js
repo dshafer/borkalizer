@@ -4,37 +4,37 @@ DS.storageIndex = localStorage['storageIndex'];
 if((typeof(DS.storageIndex)==='undefined') || (DS.storageIndex === 'null')){
   DS.storageIndex = 0;
 }
+
+var trainingData= localStorage['TrainingData'];
+bayes = new classifier.Bayesian();
+if((typeof(trainingData ) != 'undefined') && (trainingData !== null)){
+  bayes.fromJSON(JSON.parse(trainingData));
+}
+
+
 // Set up the context menus
 DS.MenuRootID = chrome.contextMenus.create({
   'title': 'Classify',
   'contexts': ['all']
 });
 
-DS.MenuConservativeID = chrome.contextMenus.create({
-  'title': 'Conservative',
-  'contexts': ['all'],
-  'parentId': DS.MenuRootID,
-  'onclick': function(info, tab){
-    storeClick(info, tab, 'conservative');
-  }
-});
-DS.MenuLiberalID = chrome.contextMenus.create({
-  'title': 'Liberal',
-  'contexts': ['all'],
-  'parentId': DS.MenuRootID,
-  'onclick': function(info, tab){
-    storeClick(info, tab, 'liberal');
-  }
-});
-DS.MenuApoliticalID = chrome.contextMenus.create({
-  'title': 'Non-political',
-  'contexts': ['all'],
-  'parentId': DS.MenuRootID,
-  'onclick': function(info, tab){
-    storeClick(info, tab, 'apolitical');
-  }
-});
-DS.MenuCurrentClassificationID = chrome.contextMenus.create({
+var classLookup = {};
+var menuItemLookup = {}
+for(var bin in classes){
+  classLookup[classes[bin].tag] = classes[bin];
+  var menuItemId = chrome.contextMenus.create({
+    'title': classes[bin].desc,
+    'contexts': ['all'],
+    'parentId':DS.MenuRootID,
+    'onclick': function(info, tab){
+      storeClick(info, tab, menuItemLookup[info.menuItemId]);
+    }
+  });
+  menuItemLookup[menuItemId]=classes[bin].tag;
+}
+classLookup.unclassified = {desc: 'Unclassified'};
+
+chrome.contextMenus.create({
   'type': 'separator',
   'contexts': ['all'],
   'parentId': DS.MenuRootID
@@ -46,8 +46,25 @@ DS.MenuCurrentClassificationID = chrome.contextMenus.create({
 });
 
 function storeClick(info, tab, category){
-  chrome.tabs.sendRequest(tab.id, "getClickedEl", function(clickedEl) {
-    localStorage[DS.storageIndex++]=JSON.stringify([category,clickedEl.value]);
-    localStorage['storageIndex']=DS.storageIndex;
+  chrome.tabs.sendRequest(tab.id, "getClickedElFingerprint", function(fingerprint) {
+    bayes.train(fingerprint, category);
+    var s = JSON.stringify(bayes.toJSON());
+    var l = s.length;
+    localStorage['TrainingData'] = s;
   });
 }
+
+chrome.extension.onMessage.addListener(
+  function (request, sender, sendResponse){
+    if(request.command == 'getTrainingData'){
+      sendResponse(JSON.stringify(bayes.toJSON()));
+    } else if (request.command == 'elementClassified'){
+      // update the context menu with the classified element
+      chrome.contextMenus.update(DS.MenuCurrentClassificationID,
+        {
+          'title': 'Current Classification: ' + classLookup[request.data].desc
+        }
+      );
+    }
+  }
+);

@@ -1,14 +1,16 @@
 var bayes;
 
-function stringifyElementForClassifier(e){
-  if(typeof(e) == 'string'){
-    var ee = document.createElement('div');
-    ee.innerHTML = e;
-    e = ee;
+var classes={
+  conservative:{
+    tag:'c',
+    desc:'Conservative'
+  },
+  liberal:{
+    tag:'l',
+    desc:'Liberal',
+  },
+  apolitical:{
+    tag:'a',
+    desc:'Non-Political'
   }
-  return e.innerText;
-}
-
-function train(datum){
-  bayes.train(stringifyElementForClassifier(datum[1]), datum[0]);
 }
