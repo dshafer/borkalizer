@@ -5,6 +5,8 @@ if((typeof(DS.storageIndex)==='undefined') || (DS.storageIndex === 'null')){
   DS.storageIndex = 0;
 }
 
+DS.sendClassificationData = localStorage['sendClassificationData'] === 'true'
+
 var trainingData= localStorage['TrainingData'];
 bayes = new classifier.Bayesian();
 if((typeof(trainingData ) != 'undefined') && (trainingData !== null)){
@@ -51,6 +53,16 @@ function storeClick(info, tab, category){
     var s = JSON.stringify(bayes.toJSON());
     var l = s.length;
     localStorage['TrainingData'] = s;
+    if(DS.sendClassificationData){
+      var req = new XMLHttpRequest();
+      req.open('POST', 'http://borkalizer.com/classified', true);
+      req.setRequestHeader('Content-Type', 'application/json');
+      var toSend = {
+        'classification':category,
+        'fingerprint':fingerprint
+      };
+      req.send(JSON.stringify(toSend));
+    }
   });
 }
 
