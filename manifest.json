@@ -12,7 +12,8 @@
   "content_scripts" : [
     {
       "matches": ["http://*.facebook.com/*"],
-      "js": ["util.js", "classifier.js", "ds_classifier.js", "content_fb.js", "content.js"]
+      "js": ["mutation_summary.js", "util.js", "classifier.js", "borkalizer.js", "content_fb.js", "content.js"],
+      "run_at": "document_start"
     }
   ],
   "permissions" : [

@@ -1,3 +1,15 @@
+function getAllChildText(e){
+  var toRet = '';
+  for(var child = e.firstChild; !!child; child = child.nextSibling){
+    if(child.nodeType === 3){
+      toRet += ' ' + child.nodeValue;
+    } else {
+      toRet += ' ' + getAllChildText(child);
+    }
+  }
+  return toRet;
+}
+
 function getInnerTextFromChildrenClass(e, className){
   var toRet = '';
   var els = e.getElementsByClassName(className);
@@ -32,3 +44,4 @@ function removeChildrenByTag(e, tagName){
     els[i].parentNode.removeChild(els[i]);
   }
 }
+
