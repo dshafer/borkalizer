@@ -2,9 +2,9 @@ function getAllChildText(e){
   var toRet = '';
   for(var child = e.firstChild; !!child; child = child.nextSibling){
     if(child.nodeType === 3){
-      toRet += ' ' + child.nodeValue;
+      toRet += ' ' + child.nodeValue.trim();
     } else {
-      toRet += ' ' + getAllChildText(child);
+      toRet += ' ' + getAllChildText(child).trim();
     }
   }
   return toRet;
@@ -43,5 +43,13 @@ function removeChildrenByTag(e, tagName){
   for(var i=0; i< els.length; i++){
     els[i].parentNode.removeChild(els[i]);
   }
+}
+
+function hasClass(e, className){
+  return (' ' + e.className + ' ').indexOf(' ' + className + ' ') > -1;
+}
+
+function hasAnyClass(e, classList){
+  return classList.some(function(c){ return hasClass(e, c); });
 }
 
