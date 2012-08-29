@@ -10,6 +10,16 @@ function getAllChildText(e){
   return toRet;
 }
 
+function transformAllChildText(e, f){
+  for(var child = e.firstChild; !!child; child = child.nextSibling){
+    if(child.nodeType === 3){
+      child.nodeValue = f(child.nodeValue);
+    } else {
+      transformAllChildText(child, f);
+    }
+  }
+}
+
 function getInnerTextFromChildrenClass(e, className){
   var toRet = '';
   var els = e.getElementsByClassName(className);

@@ -4,7 +4,9 @@
   "manifest_version": 2,
   "options_page": "options.html",
   "icons" : {
-    "16" : "img/bayes_trainer.png"
+    "16" : "img/swedish_chef_16.png",
+    "48" : "img/swedish_chef_48.png",
+    "128": "img/swedish_chef_128.png"
   },
   "background" : {
     "page": "background.html"
@@ -12,7 +14,7 @@
   "content_scripts" : [
     {
       "matches": ["http://*.facebook.com/*"],
-      "js": ["mutation_summary.js", "classifier.js", "content_fb.js", "content.js"],
+      "js": ["borkborkbork.js", "translator.js", "mutation_summary.js", "classifier.js", "content_fb.js", "content.js"],
       "run_at": "document_start"
     }
   ],

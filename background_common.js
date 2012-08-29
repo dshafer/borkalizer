@@ -14,7 +14,7 @@ if((typeof(DS.storageIndex) == 'undefined') || (DS.storageIndex === null)){
 DS.classifiedIds = localStorage['classifiedIds'];
 var classifiedIdLookup={};
 
-if((typeof(DS.classifiedIds)=='undefined') && (DS.classifiedIds == null)){
+if((typeof(DS.classifiedIds)=='undefined') || (DS.classifiedIds === null)){
   DS.classifiedIds = [];
 } else {
   DS.classifiedIds = JSON.parse(DS.classifiedIds);
@@ -23,11 +23,19 @@ if((typeof(DS.classifiedIds)=='undefined') && (DS.classifiedIds == null)){
   });
 }
 
+DS.thresholds = localStorage['thresholds'];
+if((typeof(DS.thresholds)=='undefined') || (DS.thresholds === null)){
+  DS.thresholds = {c:2,l:2,a:1};
+} else {
+  DS.thresholds = JSON.parse(DS.thresholds);
+}
+
+
 DS.sendClassificationData = localStorage['sendClassificationData'] === 'true'
 
 function reloadTrainingData() {
   var trainingData= localStorage['TrainingData'];
-  bayes = new classifier.Bayesian();
+  bayes = new classifier.Bayesian({thresholds:DS.thresholds});
   if((typeof(trainingData ) != 'undefined') && (trainingData !== null)){
     bayes.fromJSON(JSON.parse(trainingData));
   } else {
@@ -49,7 +57,7 @@ function reloadTrainingDataFromServer(){
   req.onreadystatechange = function(){
     if(req.readyState === 4){
       try{
-        bayes = new classifier.Bayesian();
+        bayes = new classifier.Bayesian({thresholds:DS.thresholds});
         bayes.fromJSON(JSON.parse(req.responseText));
         retrainFromLocalClassifications();
         localStorage['TrainingData'] = req.responseText;

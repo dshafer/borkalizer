@@ -27,14 +27,6 @@ chrome.extension.onConnect.addListener(function(port){
           id: msg.fingerprint.id,
           bin: DS.classLookup[classify(msg.fingerprint)]
         });
-    } else if(msg.command == 'getTrainingData'){
-      debugger;
-      port.postMessage(
-        {
-          command:'updateTrainingData',
-          bayes:bayes.toJSON(),
-          classifiedIdLookup:classifiedIdLookup
-        });
     } else if (msg.command == 'elementRightClicked'){
       var bin = classify(msg.fingerprint);
       // update the context menu with the classified element
@@ -43,6 +35,20 @@ chrome.extension.onConnect.addListener(function(port){
           'title': 'Current Classification: ' + DS.classLookup[bin].desc
         }
       );
+      
+      if(msg.currentState != 'none'){
+        chrome.contextMenus.update(DS.MenuToggleBorkID,
+          {
+            'title': msg.currentState == 'restored' ? 'Re-Bork' : 'Restore Original',
+            'type':'normal'
+          });
+      } else {
+        chrome.contextMenus.update(DS.MenuToggleBorkID,
+          {
+            'title': "",
+            'type':'separator'
+          });
+      }
       clickedElsFingerprint[port.sender.tab.id]=msg.fingerprint;
     }
   });
@@ -53,7 +59,7 @@ chrome.extension.onConnect.addListener(function(port){
 
 // Set up the context menus
 DS.MenuRootID = chrome.contextMenus.create({
-  'title': 'Classify',
+  'title': 'The Borkalizer!',
   'contexts': ['all']
 });
 
@@ -83,6 +89,16 @@ DS.MenuCurrentClassificationID = chrome.contextMenus.create({
   'contexts': ['all'],
   'parentId': DS.MenuRootID
 });
+DS.MenuToggleBorkID = chrome.contextMenus.create({
+  'title': 'Restore Original',
+  'contexts': ['all'],
+  'parentId': DS.MenuRootID,
+  'onclick': function(info, tab){
+    ports[tab.id].postMessage({
+      command:'toggleBork'
+    });
+  }
+});
 
 function storeClick(info, tab, category){
   var fingerprint = clickedElsFingerprint[tab.id];
@@ -108,7 +124,7 @@ function storeClick(info, tab, category){
     req.onreadystatechange = function(){
       if(req.readyState === 4){
         try{
-          bayes = new classifier.Bayesian();
+          bayes = new classifier.Bayesian({thresholds:DS.thresholds});
           bayes.fromJSON(JSON.parse(req.responseText));
         } catch (e){
           debugger;

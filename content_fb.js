@@ -11,7 +11,8 @@ var fingerprintDef = {
     'uiStreamHide',
     'ogAggregationSubstory',
     'uiStreamHeadline',
-    'timelineReportContainer'
+    'timelineReportContainer',
+    'pageMostRecentPostList'
     ],
   tagsToExclude:['form']
 }

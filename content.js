@@ -1,3 +1,8 @@
+var borkifiers={
+  'bork':{
+    translator: Translate.compile_translator(borkborkbork)
+  }
+}
 
 //generic content script.  page-specific sections should set up a custom contentContainerClasses array
 var clickedEl = null;
@@ -23,9 +28,8 @@ port.onMessage.addListener(function(msg){
         fingerprint:null
       });
     }
-  } else if(msg.command === "updateTrainingData"){
-    debugger;
-    receiveTrainingDataUpdate(msg);
+  } else if(msg.command === "toggleBork"){
+    toggleBork(clickedEl);
   }
 });
 
@@ -40,12 +44,25 @@ function getAllChildText(e){
   var toRet = '';
   for(var child = e.firstChild; !!child; child = child.nextSibling){
     if(child.nodeType === 3){
-      toRet += ' ' + child.nodeValue.trim();
+      try{
+        toRet += ' ' + child.nodeValue.trim();
+      } catch(e){
+        debugger;
+      }
     } else {
       toRet += ' ' + getAllChildText(child).trim();
     }
   }
   return toRet;
+}
+function transformAllChildText(e, f){
+  for(var child = e.firstChild; !!child; child = child.nextSibling){
+    if(child.nodeType === 3){
+      child.nodeValue = f.translate(child.nodeValue);
+    } else {
+      transformAllChildText(child, f);
+    }
+  }
 }
 function removeChildrenWithClass(e, className){
   var els = e.getElementsByClassName(className);
@@ -90,19 +107,12 @@ document.addEventListener("mousedown", function(event){
           port.postMessage(
             {
               command:'elementRightClicked', 
-              fingerprint:extractFingerprint(clickedEl)
+              fingerprint:extractFingerprint(clickedEl),
+              currentState: typeof(borkedElements[clickedEl.id]) != 'undefined' ? borkedElements[clickedEl.id].state : 'none'
             });
         }
     }
 }, true);
-
-function receiveTrainingDataUpdate(trainingData){
-  debugger;
-  bayes = new classifier.Bayesian();
-  bayes.fromJSON(trainingData.bayes);
-  classifiedIdLookup = trainingData.classifiedIdLookup;
-  reBorkDocument();
-}
 
 function locateStreamStoryParent(el){
   while((el.tagName != 'BODY')){
@@ -116,14 +126,30 @@ function locateStreamStoryParent(el){
   return null;
 }
 
+function toggleBork(el){
+  if(typeof(borkedElements[el.id]) != 'undefined'){
+    if((borkedElements[el.id].state == 'none') || (borkedElements[el.id].state == 'restored')){
+      borkedElements[el.id].state = borkedElements[el.id].action;
+      el.innerHTML = borkedElements[el.id].borkedHTML;
+    } else {
+      borkedElements[el.id].state = 'restored';
+      el.innerHTML = borkedElements[el.id].originalHTML;
+    }
+  }
+}
+
 var forEach = Array.prototype.forEach;
 var borkedElements = {};
 function borkify(id, bin){
   //var bin = classify(extractFingerprint(el));
   var lookup = bin;
   var el = eligibleElements[id];
+  if(typeof(el)=='undefined'){
+    el = document.getElementById(id);
+    eligibleElements[id]=el;
+  }
   if(typeof(lookup) != 'undefined'){
-    if(typeof(lookup.bgcolor != 'undefined')){
+    if(typeof(lookup.bgcolor) != 'undefined'){
       // change background color of all borkifyDef.containerClasses
       borkifyDef.containerClasses.forEach(function(c){
         forEach.call(el.getElementsByClassName(c), function(bgEl){
@@ -131,15 +157,28 @@ function borkify(id, bin){
         });
       });
     }
-    if(typeof(lookup.action) != 'undefined'){
+    if((typeof(lookup.action) != 'undefined') && (lookup.action !== 'none')){
       // save a copy of the original in case we want to revert later
       if(typeof(borkedElements[el.id]) == 'undefined'){
         borkedElements[el.id] = {
           action: lookup.action,
-          original: el.cloneNode(true)
+          state: lookup.action,
+          originalHTML: el.innerHTML
         };
       }
       
+      if(typeof(borkifiers[lookup.action])!='undefined'){
+        transformAllChildText(el, borkifiers[lookup.action].translator);
+      }
+      
+      borkedElements[el.id].borkedHTML = el.innerHTML;
+    } else {
+      if((typeof(borkedElements[el.id]) != 'undefined') && (borkedElements[el.id].action != 'none')){
+        // we've previously borked this element - need to restore
+        borkedElements[el.id].state = 'restored'
+        borkedElements[el.id].action = 'none';
+        el.innerHTML=borkedElements[el.id].originalHTML;
+      }
     }
   }
 }
