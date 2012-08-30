@@ -1,4 +1,5 @@
-var bayes;
+
+var forEach = Array.prototype.forEach;
 
 DS = { 'version':'0.1' };
 DS.classes={
@@ -35,6 +36,9 @@ DS.classLookup = {};
 for(var bin in DS.classes){
   DS.classLookup[DS.classes[bin].tag] = DS.classes[bin];
 }
+
+
+
 
 
 

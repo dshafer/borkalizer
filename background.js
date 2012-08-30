@@ -1,17 +1,55 @@
 
-DS.uniqueUserId = localStorage['userId'];
-if((typeof(DS.uniqueUserId) == 'undefined') || (DS.uniqueUserID === null)){
-  DS.uniqueUserId = uuid.v4();
-  localStorage['userId']=DS.uniqueUserId;
+
+function classify(fingerprint){
+  if(typeof(classifiedIdLookup[fingerprint.id])!='undefined'){
+    return classifiedIdLookup[fingerprint.id];
+  } else {
+    if(fingerprint.data.length > 0){
+      return bayes.classify(fingerprint.data);
+    } else {
+      return 'unclassified';
+    }
+  }
 }
 
-DS.sendClassificationData = localStorage['sendClassificationData'] === 'true'
+reloadTrainingData();
 
-var trainingData= localStorage['TrainingData'];
-bayes = new classifier.Bayesian();
-if((typeof(trainingData ) != 'undefined') && (trainingData !== null)){
-  bayes.fromJSON(JSON.parse(trainingData));
-}
+var ports = {};
+var clickedElsFingerprint = {};
+
+chrome.extension.onConnect.addListener(function(port){
+  ports[port.sender.tab.id]=port;
+  port.onMessage.addListener(function(msg){
+    if(msg.command == 'classifyElement'){
+      port.postMessage(
+        {
+          command: 'elementClassified',
+          id: msg.fingerprint.id,
+          bin: DS.classLookup[classify(msg.fingerprint)]
+        });
+    } else if(msg.command == 'getTrainingData'){
+      debugger;
+      port.postMessage(
+        {
+          command:'updateTrainingData',
+          bayes:bayes.toJSON(),
+          classifiedIdLookup:classifiedIdLookup
+        });
+    } else if (msg.command == 'elementRightClicked'){
+      var bin = classify(msg.fingerprint);
+      // update the context menu with the classified element
+      chrome.contextMenus.update(DS.MenuCurrentClassificationID,
+        {
+          'title': 'Current Classification: ' + DS.classLookup[bin].desc
+        }
+      );
+      clickedElsFingerprint[port.sender.tab.id]=msg.fingerprint;
+    }
+  });
+  port.onDisconnect.addListener(function(){
+    delete ports[port.sender.tab.id];
+  });
+});
 
 // Set up the context menus
 DS.MenuRootID = chrome.contextMenus.create({
@@ -47,44 +85,47 @@ DS.MenuCurrentClassificationID = chrome.contextMenus.create({
 });
 
 function storeClick(info, tab, category){
-  chrome.tabs.sendRequest(tab.id, {command: "getClickedElFingerprint"}, function(fingerprint) {
-    bayes.train(fingerprint, category);
-    var s = JSON.stringify(bayes.toJSON());
-    var l = s.length;
-    localStorage['TrainingData'] = s;
-    if(DS.sendClassificationData){
-      var req = new XMLHttpRequest();
-      req.open('POST', 'http://borkalizer.com/classified', true);
-      req.setRequestHeader('Content-Type', 'application/json');
-      var toSend = {
-        'version':DS.version,
-        'userId':DS.uniqueUserId,
-        'timestamp': (new Date()).toString(),
-        'classification':category,
-        'fingerprint':fingerprint
-      };
-      req.send(JSON.stringify(toSend));
-      sendTrainingData(tab);
-    }
-  });
-}
+  var fingerprint = clickedElsFingerprint[tab.id];
 
-function sendTrainingData(tab){
-  chrome.tabs.sendRequest(tab.id, {command:"updateTrainingData", data:bayes.toJSON()})
-}
-
-chrome.extension.onMessage.addListener(
-  function (request, sender, sendResponse){
-    if(request.command == 'getTrainingData'){
-      sendTrainingData(sender.tab);
-      //sendResponse(JSON.stringify(bayes.toJSON()));
-    } else if (request.command == 'elementClassified'){
-      // update the context menu with the classified element
-      chrome.contextMenus.update(DS.MenuCurrentClassificationID,
-        {
-          'title': 'Current Classification: ' + DS.classLookup[request.data].desc
+  bayes.train(fingerprint.data, category);
+  DS.classifiedIds.push([fingerprint.id, category]);
+  classifiedIdLookup[fingerprint.id]=category;
+  localStorage['classifiedIds']=JSON.stringify(DS.classifiedIds);
+  var s = JSON.stringify(bayes.toJSON());
+  var l = s.length;
+  localStorage['TrainingData'] = s;
+  if(DS.sendClassificationData){
+    var req = new XMLHttpRequest();
+    req.open('POST', 'http://borkalizer.com/classified', true);
+    req.setRequestHeader('Content-Type', 'application/json');
+    var toSend = {
+      'version':DS.version,
+      'userId':DS.uniqueUserId,
+      'timestamp': (new Date()).valueOf(),
+      'classification':category,
+      'fingerprint':fingerprint
+    };
+    req.onreadystatechange = function(){
+      if(req.readyState === 4){
+        try{
+          bayes = new classifier.Bayesian();
+          bayes.fromJSON(JSON.parse(req.responseText));
+        } catch (e){
+          debugger;
         }
-      );
+      }
     }
+    req.send(JSON.stringify(toSend));
+    ports[tab.id].postMessage(
+      {
+        command: 'elementClassified',
+        id: fingerprint.id,
+        bin: DS.classLookup[category]
+      });
+  } else { 
+    // not sending training data back to the server.  Save the fingerpring locally so we can retrain as necessary
+    var storageKey = 'training_' + DS.storageIndex++;
+    localStorage[storageKey] = JSON.stringify([fingerprint, category, DS.sendClassificationData]);
+    localStorage['storageIndex'] = DS.storageIndex.toString();
   }
-);
+}
