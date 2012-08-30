@@ -107,10 +107,9 @@ function storeClick(info, tab, category){
   DS.classifiedIds.push([fingerprint.id, category]);
   classifiedIdLookup[fingerprint.id]=category;
   localStorage['classifiedIds']=JSON.stringify(DS.classifiedIds);
-  var s = JSON.stringify(bayes.toJSON());
-  var l = s.length;
-  localStorage['TrainingData'] = s;
-  if(DS.sendClassificationData){
+
+  if(DS.sendIndividualClassificationData){
+    // this is the case if users elect to send individual classified fingerprints to the server
     var req = new XMLHttpRequest();
     req.open('POST', 'http://borkalizer.com/classified', true);
     req.setRequestHeader('Content-Type', 'application/json');
@@ -132,16 +131,17 @@ function storeClick(info, tab, category){
       }
     }
     req.send(JSON.stringify(toSend));
-    ports[tab.id].postMessage(
-      {
-        command: 'elementClassified',
-        id: fingerprint.id,
-        bin: DS.classLookup[category]
-      });
-  } else { 
-    // not sending training data back to the server.  Save the fingerpring locally so we can retrain as necessary
-    var storageKey = 'training_' + DS.storageIndex++;
-    localStorage[storageKey] = JSON.stringify([fingerprint, category, DS.sendClassificationData]);
-    localStorage['storageIndex'] = DS.storageIndex.toString();
+  } else {
+    // this is the normal case
+    bayesPrivate.train(fingerprint.data, category);
   }
+
+  saveTrainingData();
+
+  ports[tab.id].postMessage(
+    {
+      command: 'elementClassified',
+      id: fingerprint.id,
+      bin: DS.classLookup[category]
+    });
 }

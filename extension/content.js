@@ -4,6 +4,18 @@ var borkifiers={
   }
 }
 
+var idGen = 0;
+var getId = function(el){
+  if(typeof(getElementUniqueId)==='function'){
+    return getElementUniqueId(el);
+  } else {
+    if(el.id===""){
+      el.id=(idGen++).toString();
+    }
+    return el.id;
+  }
+}
+
 //generic content script.  page-specific sections should set up a custom contentContainerClasses array
 var clickedEl = null;
 
@@ -58,7 +70,10 @@ function getAllChildText(e){
 function transformAllChildText(e, f){
   for(var child = e.firstChild; !!child; child = child.nextSibling){
     if(child.nodeType === 3){
-      child.nodeValue = f.translate(child.nodeValue);
+      if(typeof(child.originalText)=='undefined'){
+        child.originalText = child.nodeValue;
+      }
+      child.nodeValue = f.translate(child.originalText);
     } else {
       transformAllChildText(child, f);
     }
@@ -77,9 +92,10 @@ function removeChildrenByTag(e, tagName){
   }
 }
 function extractFingerprint(e){
-  var toRet = originalFingerprints[e.id];
+  var id = getId(e);
+  var toRet = originalFingerprints[id];
   if(typeof(toRet) == 'undefined'){
-    toRet = {id:e.id};
+    toRet = {id:id};
     var n = e.cloneNode(true);
     if(typeof(fingerprintDef) != 'undefined'){
       if(typeof(fingerprintDef.classesToExclude) != 'undefined'){
@@ -94,7 +110,7 @@ function extractFingerprint(e){
       }
     }
     toRet.data = getAllChildText(n).trim();
-    originalFingerprints[e.id] = toRet;
+    originalFingerprints[id] = toRet;
   }
   return toRet;
 }
@@ -104,11 +120,12 @@ document.addEventListener("mousedown", function(event){
     if(event.button == 2) { 
         clickedEl = locateStreamStoryParent(event.target);
         if(clickedEl != null){
+          var id = getId(clickedEl);
           port.postMessage(
             {
               command:'elementRightClicked', 
               fingerprint:extractFingerprint(clickedEl),
-              currentState: typeof(borkedElements[clickedEl.id]) != 'undefined' ? borkedElements[clickedEl.id].state : 'none'
+              currentState: typeof(borkedElements[id]) != 'undefined' ? borkedElements[id].state : 'none'
             });
         }
     }
@@ -127,13 +144,14 @@ function locateStreamStoryParent(el){
 }
 
 function toggleBork(el){
-  if(typeof(borkedElements[el.id]) != 'undefined'){
-    if((borkedElements[el.id].state == 'none') || (borkedElements[el.id].state == 'restored')){
-      borkedElements[el.id].state = borkedElements[el.id].action;
-      el.innerHTML = borkedElements[el.id].borkedHTML;
+  var id = getId(el);
+  if(typeof(borkedElements[id]) != 'undefined'){
+    if((borkedElements[id].state == 'none') || (borkedElements[id].state == 'restored')){
+      borkedElements[id].state = borkedElements[id].action;
+      el.innerHTML = borkedElements[id].borkedHTML;
     } else {
-      borkedElements[el.id].state = 'restored';
-      el.innerHTML = borkedElements[el.id].originalHTML;
+      borkedElements[id].state = 'restored';
+      el.innerHTML = borkedElements[id].originalHTML;
     }
   }
 }
@@ -145,8 +163,7 @@ function borkify(id, bin){
   var lookup = bin;
   var el = eligibleElements[id];
   if(typeof(el)=='undefined'){
-    el = document.getElementById(id);
-    eligibleElements[id]=el;
+    debugger;
   }
   if(typeof(lookup) != 'undefined'){
     if(typeof(lookup.bgcolor) != 'undefined'){
@@ -159,8 +176,8 @@ function borkify(id, bin){
     }
     if((typeof(lookup.action) != 'undefined') && (lookup.action !== 'none')){
       // save a copy of the original in case we want to revert later
-      if(typeof(borkedElements[el.id]) == 'undefined'){
-        borkedElements[el.id] = {
+      if(typeof(borkedElements[id]) == 'undefined'){
+        borkedElements[id] = {
           action: lookup.action,
           state: lookup.action,
           originalHTML: el.innerHTML
@@ -171,13 +188,13 @@ function borkify(id, bin){
         transformAllChildText(el, borkifiers[lookup.action].translator);
       }
       
-      borkedElements[el.id].borkedHTML = el.innerHTML;
+      borkedElements[id].borkedHTML = el.innerHTML;
     } else {
-      if((typeof(borkedElements[el.id]) != 'undefined') && (borkedElements[el.id].action != 'none')){
+      if((typeof(borkedElements[id]) != 'undefined') && (borkedElements[id].action != 'none')){
         // we've previously borked this element - need to restore
-        borkedElements[el.id].state = 'restored'
-        borkedElements[el.id].action = 'none';
-        el.innerHTML=borkedElements[el.id].originalHTML;
+        borkedElements[id].state = 'restored'
+        borkedElements[id].action = 'none';
+        el.innerHTML=borkedElements[id].originalHTML;
       }
     }
   }
@@ -209,22 +226,20 @@ var observer = new MutationSummary({
         var el = response[i].added[j];
         // make sure it's not in one of our contentIgnoreClasses
         if(!hasAnyClass(el, contentIgnoreClasses)){
-          if(el.id===""){
-            el.id=(idGen++).toString();
+          var id = getId(el);
+          if(typeof(eligibleElements[id])=='undefined'){
+            eligibleElements[id]=el;
           }
-          if(typeof(eligibleElements[el.id])=='undefined'){
-            eligibleElements[el.id]=el;
-          }
-            port.postMessage({
-              command: 'classifyElement',
-              fingerprint:extractFingerprint(el)
-            });
+          port.postMessage({
+            command: 'classifyElement',
+            fingerprint:extractFingerprint(el)
+          });
           }
         }
         for(var j=0; j<response[i].removed.length; j++){
           var el = response[i].removed[j];
-          if(typeof(eligibleElements[el.id])!='undefined'){
-            delete eligibleElements[el.id];
+          if(typeof(eligibleElements[id])!='undefined'){
+            delete eligibleElements[id];
           }
         }
       }
