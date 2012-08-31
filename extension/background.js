@@ -12,7 +12,7 @@ var timeToSendPrivateTrainingDataToServer = function(){
 }
 var sendPrivateTrainingDataIfReady = function(){
   if(timeToSendPrivateTrainingDataToServer()){
-    sendBayesPrivateDefsToServer(function(success){
+    borkalizer.sendBayesPrivateDefsToServer(function(success){
       if(success){
         settings.save();
       }
