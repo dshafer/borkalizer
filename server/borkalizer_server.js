@@ -11,15 +11,25 @@ var training_log = 'training.log';
 var port = 8080;
 
 var bayes = new classifier.Bayesian();
+var dictCount=0;
+var indivCount=0;
 onEachLineOf(classified_log, '>>>>', trainIndividual, function(){
-  onEachLineOf(training_log, '>>>>', trainDictionary, startServer);
+  onEachLineOf(training_log, '>>>>', trainDictionary, function(){
+    console.log('finished training from ' + dictCount.toString() + ' dictionaries and ' + indivCount.toString() + ' individual fingerprints.');
+    var tot=0;
+    console.log('category data:');
+    for(var cat in bayes.backend.catCounts){
+      console.log('  ' + cat.toString() + ': ' + bayes.backend.catCounts[cat].toString());
+      tot += bayes.backend.catCounts[cat];
+    }
+    startServer();
+  });
 });
 
 function onEachLineOf(fileName, lineSeparator, lineCallback, onDone){
+  onDone = onDone || function(){};
   if(!fs.existsSync(fileName)){
-    if(typeof(onDone)=='function'){
-      onDone();
-    }
+    onDone();
     return;
   }
   var input = fs.createReadStream(fileName);
@@ -44,17 +54,17 @@ function onEachLineOf(fileName, lineSeparator, lineCallback, onDone){
     if(remaining.length>0){
       lineCallback(remaining);
     }
-    if(typeof(onDone)=='function'){
-      onDone();
-    }
+    onDone();
   });
 }
 
 function trainDictionary(line){
+  dictCount++;
   var trainingData = JSON.parse(line);
   bayes.backend.incCounts(trainingData.cats, trainingData.words);
 }
 function trainIndividual(line){
+  indivCount++;
   var trainingData = JSON.parse(line);
   bayes.train(trainingData.fingerprint.data, trainingData.classification);
 }
@@ -77,12 +87,16 @@ function startServer(){
   // clients send completed dictionaries to /training
   app.router.post('/training', function(){
     console.log('received training post:');
-    console.log(this.req.body);
+    var b = this.req.body;
+    for(var cat in b.cats){
+      console.log('  ' + cat.toString() + ': ' + b.cats[cat].toString());
+    }
+    console.log(b);
     fs.appendFile(training_log, 
       ">>>>\n" +
-      JSON.stringify(this.req.body) +
+      JSON.stringify(b) +
       "\n");
-    bayes.backend.incCounts(this.req.body.cats, this.req.body.words);
+    bayes.backend.incCounts(b.cats, b.words);
     this.res.json(bayes.toJSON());
   });
 
