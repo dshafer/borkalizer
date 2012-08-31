@@ -1,13 +1,55 @@
 <html>
 <head>
   <title>Options for Politics Borker</title>
-  <script type="text/javascript" src="classifier.js"></script>
-  <script type="text/javascript" src="borkalizer.js"></script>
-  <script type="text/javascript" src="background_common.js"></script>
+  <link href="css/bootstrap.min.css" rel="stylesheet" type="text/css" />
+  <link href="css/options.css" rel="stylesheet" type="text/css" />
 </head>
 <body>
-  <input type="checkbox" id="sendFeedbackData">Help make the Borkalizer better by sending training feedback to borkalizer.com</input><br/>
-  <button type="button" id="btnSaveSettings">Save</button>
+  <div class="navbar navbar-inverse navbar-static-top">
+    <div class="navbar-inner">
+      <div class="container">
+        <a class="brand" href="#">The Borkalizer!</a>
+        <div class="nav-collapse collapse">
+          <ul class="nav">
+            <li class="active"><a href="#">Options</a></li>
+          </ul>
+          <span class="pull-right">
+            <p class="navbar-text">Version: <span id='versionNumber' /></p>
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class='container'>
+    <div class='row'>
+      <div class=''>
+        <div class='option-group'>
+          <label>
+            Wait at least <input class='number' type="number" id='sendSummarizedClassificationDataTimer' value='24' /> hours between sending summarized classification data to <a href="borkalizer.com">borkalizer.com</a> (0 = disable).<br/>
+            <div class="row">
+              <div class="span4 offset1">Summary data last uploaded at: <span id='lastSummarizedClassificationDataSentTS'></span></div>
+              <div class="span6">
+                There are <span id="numPendingClassifications"></span> classifications pending upload. <button id="btnUploadPendingClassifications">Upload Now</button><span id="uploadError"></span>
+              </div>
+            </div>
+          </label>
+          <label>
+            <input class="checkbox" type="checkbox" id="sendIndividualClassificationData"></input>
+            Send individual classification data to <a href="borkalizer.com">borkalizer.com</a>
+          </label>
+        </div>
+      </div>
+    </div>
+    <div class='row'>
+      <div class='span4 offset4 pagination-centered'>
+        <button id="btnSaveSettings">Save</button>
+      </div>
+    </div>
+  </div>
+  <script type="text/javascript" src="uuid.js"></script>
+  <script type="text/javascript" src="settings.js"></script>
+  <script type="text/javascript" src="classifier.js"></script>
+  <script type="text/javascript" src="borkalizer.js"></script>
   <script type="text/javascript" src="options.js"></script>
 </body>
 </html>

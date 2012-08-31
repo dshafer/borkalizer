@@ -1,21 +1,66 @@
+var ports = {};
+var clickedElsFingerprint = {};
 
+borkalizer.load();
 
-function classify(fingerprint){
-  if(typeof(classifiedIdLookup[fingerprint.id])!='undefined'){
-    return classifiedIdLookup[fingerprint.id];
+var timeToSendPrivateTrainingDataToServer = function(){
+  if(settings.sendSummarizedClassificationDataTimer > 0){
+      return ((new Date())-settings.lastSummarizedClassificationDataSentTS) > settings.sendSummarizedClassificationDataTimer;
   } else {
-    if(fingerprint.data.length > 0){
-      return bayes.classify(fingerprint.data);
-    } else {
-      return 'unclassified';
-    }
+    return false;
+  }
+}
+var sendPrivateTrainingDataIfReady = function(){
+  if(timeToSendPrivateTrainingDataToServer()){
+    sendBayesPrivateDefsToServer(function(success){
+      if(success){
+        settings.save();
+      }
+    });
   }
 }
 
-reloadTrainingData();
+sendPrivateTrainingDataIfReady();
 
-var ports = {};
-var clickedElsFingerprint = {};
+// Set up the context menus
+menuRootID = chrome.contextMenus.create({
+  'title': 'The Borkalizer!',
+  'contexts': ['all']
+});
+var menuItemLookup = {}
+for(var cat in settings.classes){
+  if(settings.classes[cat].showMenu){
+    var menuItemId = chrome.contextMenus.create({
+      'title': settings.classes[cat].desc,
+      'contexts': ['all'],
+      'parentId':menuRootID,
+      'onclick': function(info, tab){
+        storeClick(info, tab, menuItemLookup[info.menuItemId]);
+      }
+    });
+    menuItemLookup[menuItemId]=settings.classes[cat].tag;
+  }
+}
+chrome.contextMenus.create({
+  'type': 'separator',
+  'contexts': ['all'],
+  'parentId': menuRootID
+});
+menuCurrentClassificationID = chrome.contextMenus.create({
+  'title': 'Current Classification:',
+  'contexts': ['all'],
+  'parentId': menuRootID
+});
+menuToggleBorkID = chrome.contextMenus.create({
+  'title': 'Restore Original',
+  'contexts': ['all'],
+  'parentId': menuRootID,
+  'onclick': function(info, tab){
+    ports[tab.id].postMessage({
+      command:'toggleBork'
+    });
+  }
+});
 
 chrome.extension.onConnect.addListener(function(port){
   ports[port.sender.tab.id]=port;
@@ -25,25 +70,27 @@ chrome.extension.onConnect.addListener(function(port){
         {
           command: 'elementClassified',
           id: msg.fingerprint.id,
-          bin: DS.classLookup[classify(msg.fingerprint)]
+          bin: settings.classLookup[borkalizer.classify(msg.fingerprint)]
         });
+      sendPrivateTrainingDataIfReady();
+
     } else if (msg.command == 'elementRightClicked'){
-      var bin = classify(msg.fingerprint);
+      var bin = borkalizer.classify(msg.fingerprint);
       // update the context menu with the classified element
-      chrome.contextMenus.update(DS.MenuCurrentClassificationID,
+      chrome.contextMenus.update(menuCurrentClassificationID,
         {
-          'title': 'Current Classification: ' + DS.classLookup[bin].desc
+          'title': 'Current Classification: ' + settings.classLookup[bin].desc
         }
       );
       
       if(msg.currentState != 'none'){
-        chrome.contextMenus.update(DS.MenuToggleBorkID,
+        chrome.contextMenus.update(menuToggleBorkID,
           {
             'title': msg.currentState == 'restored' ? 'Re-Bork' : 'Restore Original',
             'type':'normal'
           });
       } else {
-        chrome.contextMenus.update(DS.MenuToggleBorkID,
+        chrome.contextMenus.update(menuToggleBorkID,
           {
             'title': "",
             'type':'separator'
@@ -57,91 +104,24 @@ chrome.extension.onConnect.addListener(function(port){
   });
 });
 
-// Set up the context menus
-DS.MenuRootID = chrome.contextMenus.create({
-  'title': 'The Borkalizer!',
-  'contexts': ['all']
-});
-
-var menuItemLookup = {}
-for(var bin in DS.classes){
-  if(DS.classes[bin].showMenu){
-    var menuItemId = chrome.contextMenus.create({
-      'title': DS.classes[bin].desc,
-      'contexts': ['all'],
-      'parentId':DS.MenuRootID,
-      'onclick': function(info, tab){
-        storeClick(info, tab, menuItemLookup[info.menuItemId]);
-      }
-    });
-    menuItemLookup[menuItemId]=DS.classes[bin].tag;
-  }
-}
-
-
-chrome.contextMenus.create({
-  'type': 'separator',
-  'contexts': ['all'],
-  'parentId': DS.MenuRootID
-});
-DS.MenuCurrentClassificationID = chrome.contextMenus.create({
-  'title': 'Current Classification:',
-  'contexts': ['all'],
-  'parentId': DS.MenuRootID
-});
-DS.MenuToggleBorkID = chrome.contextMenus.create({
-  'title': 'Restore Original',
-  'contexts': ['all'],
-  'parentId': DS.MenuRootID,
-  'onclick': function(info, tab){
-    ports[tab.id].postMessage({
-      command:'toggleBork'
-    });
-  }
-});
+chrome.extension.onMessage.addListener(
+  function(request, sender, sendResponse) {
+    if (request.command === 'reload-settings'){
+      settings.load();
+      borkalizer.load();
+    } else {
+      debugger;
+    }
+  });
 
 function storeClick(info, tab, category){
   var fingerprint = clickedElsFingerprint[tab.id];
-
-  bayes.train(fingerprint.data, category);
-  DS.classifiedIds.push([fingerprint.id, category]);
-  classifiedIdLookup[fingerprint.id]=category;
-  localStorage['classifiedIds']=JSON.stringify(DS.classifiedIds);
-
-  if(DS.sendIndividualClassificationData){
-    // this is the case if users elect to send individual classified fingerprints to the server
-    var req = new XMLHttpRequest();
-    req.open('POST', 'http://borkalizer.com/classified', true);
-    req.setRequestHeader('Content-Type', 'application/json');
-    var toSend = {
-      'version':DS.version,
-      'userId':DS.uniqueUserId,
-      'timestamp': (new Date()).valueOf(),
-      'classification':category,
-      'fingerprint':fingerprint
-    };
-    req.onreadystatechange = function(){
-      if(req.readyState === 4){
-        try{
-          bayes = new classifier.Bayesian({thresholds:DS.thresholds});
-          bayes.fromJSON(JSON.parse(req.responseText));
-        } catch (e){
-          debugger;
-        }
-      }
-    }
-    req.send(JSON.stringify(toSend));
-  } else {
-    // this is the normal case
-    bayesPrivate.train(fingerprint.data, category);
-  }
-
-  saveTrainingData();
-
+  borkalizer.train(fingerprint, category);
+  borkalizer.save();
   ports[tab.id].postMessage(
     {
       command: 'elementClassified',
       id: fingerprint.id,
-      bin: DS.classLookup[category]
+      bin: settings.classLookup[category]
     });
 }

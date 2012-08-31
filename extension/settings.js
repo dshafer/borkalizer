@@ -10,13 +10,13 @@
         unclassified:{tag:'unclassified',desc:'Unclassified',action:'none',showMenu:false}
       },
     'uniqueUserID':uuid.v4(),
-    'classifiedIds':[],
+    'classifiedIds':{},
     'thresholds':{'c':2,'l':2,'a':1},
     'classificationUrl':'http://borkalizer.com/classified',
     'trainingUrl':'http://borkalizer.com/training',
-    'sendIndividualClassificationData':false,
+    'sendIndividualClassificationData':'false',
     'sendSummarizedClassificationDataTimer':24*60*60*1000,  // send summarized update every 24 hours by default
-    'lastSummarizedClassificationDataSentTS':(new Date()).valueOf()
+    'lastSummarizedClassificationDataSentTS':-1
   };
   var load = function(){
     for(var setting in defaults){
@@ -35,19 +35,30 @@
     for(var cat in settings.classes){
       settings.classLookup[settings.classes[cat].tag] = settings.classes[cat];
     }
-    settings.classifiedIdLookup = {};
-    settings.classifiedIds.forEach(function(i){
-      settings.classifiedIdLookup[i[0]]=i[1];
-    });
   };
   
-  var save = function(){
-    for(var setting in defaults){
-      if(typeof(defaults[setting])==='string'){
-        localStorage[setting]=settings[setting];
+  var save = function(which){
+    var saveProp = function(prop){
+      if(typeof(defaults[prop])==='object'){
+        localStorage[prop]=JSON.stringify(settings[prop]);
+      } else if(typeof(defaults[prop]!=='undefined')) {
+        localStorage[prop]=settings[prop];
       } else {
-        localStorage[setting]=JSON.stringify(settings[setting]);
+        throw "unknown setting: '" + prop + "'";
       }
+    }
+    if(typeof(which)==='undefined'){
+      for(var setting in defaults){
+        saveProp(setting);
+      }
+    } else if(typeof(which)==='string'){
+      saveProp(which);
+    } else if(typeof(which.length)!=='undefined'){
+      for(var x=0;x<which.length;x++){
+        saveProp(which[x]);
+      }
+    } else {
+      throw "don't know how to iterate this setting";
     }
   }
   
@@ -73,4 +84,3 @@
   _global.settings = settings;
 })();
 
-debugger;
