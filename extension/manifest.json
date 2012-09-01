@@ -13,7 +13,7 @@
   },
   "content_scripts" : [
     {
-      "matches": ["http://*.facebook.com/*"],
+      "matches": ["*://*.facebook.com/*"],
       "js": ["borkborkbork.js", "translator.js", "mutation_summary.js", "content_fb.js", "content.js"],
       "run_at": "document_start"
     }
